@@ -1,0 +1,128 @@
+'use client';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, Suspense, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { addDoc, collection } from 'firebase/firestore';
+import liff from '@line/liff';
+
+function ConfirmContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(false);
+  const [lineUserId, setLineUserId] = useState('temp-user');
+
+  const menu = searchParams.get('menu') || '';
+  const time = searchParams.get('time') || '';
+  const price = searchParams.get('price') || '';
+  const date = searchParams.get('date') || '';
+  const slot = searchParams.get('slot') || '';
+
+  useEffect(() => {
+    // LINEユーザーIDを取得
+    const getLineUser = async () => {
+      try {
+        await liff.init({ liffId: '2010454791-miMuAYxd' });
+        if (liff.isLoggedIn()) {
+          const profile = await liff.getProfile();
+          setLineUserId(profile.userId);
+        }
+      } catch (e) {
+        console.log('LIFF初期化エラー（ローカル環境）:', e);
+      }
+    };
+    getLineUser();
+  }, []);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'bookings'), {
+        lineUserId, // 実際のLINEユーザーIDが入る
+        menu,
+        date,
+        slot,
+        price,
+        time,
+        status: 'confirmed',
+        createdAt: new Date(),
+      });
+
+      // LINE上ではメッセージ送信
+      try {
+        if (liff.isInClient()) {
+          await liff.sendMessages([{
+            type: 'text',
+            text: `✅ 予約が確定しました！\n\n📋 メニュー: ${menu}\n📅 日付: ${date}\n🕐 時間: ${slot}\n💴 料金: ${price}`,
+          }]);
+        }
+      } catch (e) {
+        console.log('メッセージ送信エラー:', e);
+      }
+
+      router.push('/complete');
+    } catch (e) {
+      console.error('保存エラー:', e);
+      alert('保存に失敗しました。もう一度お試しください。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-blue-600 text-white p-6">
+        <button onClick={() => router.back()} className="text-sm mb-2">← 戻る</button>
+        <h1 className="text-xl font-bold">予約内容の確認</h1>
+      </div>
+      <div className="p-4">
+        <div className="bg-white rounded-xl shadow p-6 mb-6">
+          <h2 className="font-bold text-lg mb-4 text-gray-700">予約内容</h2>
+          <div className="space-y-3">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-gray-500">メニュー</span>
+              <span className="font-bold">{menu}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-gray-500">所要時間</span>
+              <span className="font-bold">{time}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-gray-500">日付</span>
+              <span className="font-bold">{date}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-gray-500">時間</span>
+              <span className="font-bold">{slot}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">料金</span>
+              <span className="font-bold text-blue-600 text-lg">{price}</span>
+            </div>
+          </div>
+        </div>
+        <p className="text-sm text-gray-500 text-center mb-4">上記の内容で予約を確定します</p>
+        <button
+          onClick={handleConfirm}
+          disabled={loading}
+          className="w-full bg-blue-600 text-white rounded-xl p-4 font-bold text-lg disabled:opacity-50"
+        >
+          {loading ? '処理中...' : '予約を確定する'}
+        </button>
+        <button
+          onClick={() => router.back()}
+          className="w-full mt-3 border border-gray-300 text-gray-600 rounded-xl p-4 font-bold"
+        >
+          修正する
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function ConfirmPage() {
+  return (
+    <Suspense>
+      <ConfirmContent />
+    </Suspense>
+  );
+}
