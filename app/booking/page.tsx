@@ -24,7 +24,7 @@ function BookingContent() {
       return;
     }
     router.push(
-      `/confirm?menu=${menu}&time=${time}&price=${price}&date=${selectedDate}&slot=${selectedTime}`
+      `/profile?menu=${menu}&time=${time}&price=${price}&date=${selectedDate}&slot=${selectedTime}`
     );
   };
 
@@ -67,7 +67,7 @@ function BookingContent() {
           onClick={handleNext}
           className="w-full bg-blue-600 text-white rounded-xl p-4 font-bold text-lg"
         >
-          次へ（予約確認）
+          次へ（お客様情報入力）
         </button>
       </div>
     </div>

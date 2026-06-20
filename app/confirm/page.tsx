@@ -1,6 +1,6 @@
 'use client';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, Suspense, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { db } from '@/lib/firebase';
 import { addDoc, collection } from 'firebase/firestore';
 import liff from '@line/liff';
@@ -16,10 +16,19 @@ function ConfirmContent() {
   const price = searchParams.get('price') || '';
   const date = searchParams.get('date') || '';
   const slot = searchParams.get('slot') || '';
+  const name = searchParams.get('name') || '';
+  const phone = searchParams.get('phone') || '';
+  const email = searchParams.get('email') || '';
+  const lineUserIdParam = searchParams.get('lineUserId') || '';
 
   useEffect(() => {
-    // LINEユーザーIDを取得
-    const getLineUser = async () => {
+    const init = async () => {
+      // URLパラメータにlineUserIdがあればそれを使用
+      if (lineUserIdParam) {
+        setLineUserId(lineUserIdParam);
+        return;
+      }
+      // なければLIFFから取得
       try {
         await liff.init({ liffId: '2010454791-miMuAYxd' });
         if (liff.isLoggedIn()) {
@@ -27,17 +36,20 @@ function ConfirmContent() {
           setLineUserId(profile.userId);
         }
       } catch (e) {
-        console.log('LIFF初期化エラー（ローカル環境）:', e);
+        console.log('LIFF初期化エラー:', e);
       }
     };
-    getLineUser();
+    init();
   }, []);
 
   const handleConfirm = async () => {
     setLoading(true);
     try {
       await addDoc(collection(db, 'bookings'), {
-        lineUserId, // 実際のLINEユーザーIDが入る
+        lineUserId,
+        name,
+        phone,
+        email,
         menu,
         date,
         slot,
@@ -52,7 +64,7 @@ function ConfirmContent() {
         if (liff.isInClient()) {
           await liff.sendMessages([{
             type: 'text',
-            text: `✅ 予約が確定しました！\n\n📋 メニュー: ${menu}\n📅 日付: ${date}\n🕐 時間: ${slot}\n💴 料金: ${price}`,
+            text: `✅ 予約が確定しました！\n\n👤 お名前: ${name}\n📋 メニュー: ${menu}\n📅 日付: ${date}\n🕐 時間: ${slot}\n💴 料金: ${price}`,
           }]);
         }
       } catch (e) {
@@ -74,10 +86,25 @@ function ConfirmContent() {
         <button onClick={() => router.back()} className="text-sm mb-2">← 戻る</button>
         <h1 className="text-xl font-bold">予約内容の確認</h1>
       </div>
+
       <div className="p-4">
         <div className="bg-white rounded-xl shadow p-6 mb-6">
           <h2 className="font-bold text-lg mb-4 text-gray-700">予約内容</h2>
           <div className="space-y-3">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-gray-500">お名前</span>
+              <span className="font-bold">{name}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-gray-500">電話番号</span>
+              <span className="font-bold">{phone}</span>
+            </div>
+            {email && (
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">メール</span>
+                <span className="font-bold">{email}</span>
+              </div>
+            )}
             <div className="flex justify-between border-b pb-2">
               <span className="text-gray-500">メニュー</span>
               <span className="font-bold">{menu}</span>
@@ -100,7 +127,11 @@ function ConfirmContent() {
             </div>
           </div>
         </div>
-        <p className="text-sm text-gray-500 text-center mb-4">上記の内容で予約を確定します</p>
+
+        <p className="text-sm text-gray-500 text-center mb-4">
+          上記の内容で予約を確定します
+        </p>
+
         <button
           onClick={handleConfirm}
           disabled={loading}
@@ -108,6 +139,7 @@ function ConfirmContent() {
         >
           {loading ? '処理中...' : '予約を確定する'}
         </button>
+
         <button
           onClick={() => router.back()}
           className="w-full mt-3 border border-gray-300 text-gray-600 rounded-xl p-4 font-bold"
