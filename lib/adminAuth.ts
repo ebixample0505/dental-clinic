@@ -3,15 +3,15 @@ export const checkAdminAuth = () => {
   return sessionStorage.getItem('admin_authenticated') === 'true';
 };
 
-export const requireAdminAuth = (router: any) => {
+export const requireAdminAuth = (_router: any) => {
   if (!checkAdminAuth()) {
-    router.replace('/admin/login');
+    window.location.href = '/admin/login';
     return false;
   }
   return true;
 };
 
-export const adminLogout = (router: any) => {
+export const adminLogout = (_router: any) => {
   sessionStorage.removeItem('admin_authenticated');
-  router.replace('/admin/login');
+  window.location.href = '/admin/login';
 };

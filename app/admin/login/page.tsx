@@ -25,8 +25,8 @@ export default function AdminLoginPage() {
 
       if (res.ok) {
         sessionStorage.setItem('admin_authenticated', 'true');
-        router.push('/admin');
-      } else {
+        window.location.href = 'http://localhost:3000/admin';
+      }else {
         setError('パスワードが正しくありません');
       }
     } catch (e) {

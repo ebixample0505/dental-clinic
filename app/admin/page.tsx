@@ -1,12 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import {
   collection, getDocs, query,
   orderBy, updateDoc, doc
 } from 'firebase/firestore';
-import { requireAdminAuth, adminLogout } from '@/lib/adminAuth';
 
 type Booking = {
   id: string;
@@ -24,7 +22,6 @@ type Booking = {
 };
 
 export default function AdminPage() {
-  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'calendar' | 'week' | 'list'>('calendar');
@@ -44,7 +41,12 @@ export default function AdminPage() {
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
 
   useEffect(() => {
-    if (!requireAdminAuth(router)) return;
+    // 認証チェック
+    const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+    if (!isAuthenticated) {
+      window.location.href = '/admin/login';
+      return;
+    }
     fetchBookings();
   }, []);
 
@@ -72,6 +74,11 @@ export default function AdminPage() {
     await updateDoc(doc(db, 'bookings', id), { status });
     fetchBookings();
     setSelectedBooking(null);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('admin_authenticated');
+    window.location.href = '/admin/login';
   };
 
   const toDateString = (date: Date) => date.toISOString().split('T')[0];
@@ -195,25 +202,31 @@ export default function AdminPage() {
         <p className="text-xs text-gray-400">美容室予約管理システム</p>
         <div className="flex gap-2 mt-3 flex-wrap">
           <button
-            onClick={() => router.push('/admin/customers')}
+            onClick={() => window.location.href = '/admin/customers'}
             className="bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg"
           >
             顧客管理
           </button>
           <button
-            onClick={() => router.push('/admin/coupons')}
+            onClick={() => window.location.href = '/admin/coupons'}
             className="bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg"
           >
             クーポン管理
           </button>
           <button
-            onClick={() => router.push('/admin/messages')}
+            onClick={() => window.location.href = '/admin/messages'}
             className="bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg"
           >
             メッセージ管理
           </button>
           <button
-            onClick={() => adminLogout(router)}
+            onClick={() => window.location.href = '/admin/menus'}
+            className="bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg"
+          >
+            メニュー管理
+          </button>
+          <button
+            onClick={handleLogout}
             className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg"
           >
             ログアウト

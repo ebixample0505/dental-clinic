@@ -8,18 +8,16 @@ const db = getFirestore();
 
 exports.sendDailyReminders = onSchedule(
   {
-    schedule: '0 12 * * *', // 毎日UTC12:00（日本時間21:00）
+    schedule: '0 12 * * *',
     timeZone: 'Asia/Tokyo',
   },
   async (event) => {
-    // 明日の日付を取得
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
     console.log(`明日の予約を検索: ${tomorrowStr}`);
 
-    // 明日の予約を取得
     const snapshot = await db.collection('bookings')
       .where('date', '==', tomorrowStr)
       .where('status', '==', 'confirmed')
@@ -34,14 +32,181 @@ exports.sendDailyReminders = onSchedule(
 
     for (const doc of snapshot.docs) {
       const booking = doc.data();
-      const message = `【予約リマインド】\n\n明日のご予約のお知らせです。\n\nメニュー: ${booking.menu}\n日付: ${booking.date}\n時間: ${booking.slot}\n料金: ${booking.price}\n\nご来店をお待ちしております！\n\nキャンセルはこちら\nhttps://dental-clinic-indol-pi.vercel.app/mypage`;
+
+      const flexMessage = {
+        type: 'flex',
+        altText: `【予約リマインド】明日 ${booking.slot} ${booking.menu}のご予約があります`,
+        contents: {
+          type: 'bubble',
+          size: 'mega',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '予約リマインド',
+                color: '#ffffff',
+                size: 'sm',
+                weight: 'bold',
+              },
+              {
+                type: 'text',
+                text: '明日のご予約のお知らせ',
+                color: '#ffffff',
+                size: 'xl',
+                weight: 'bold',
+                margin: 'sm',
+              },
+            ],
+            backgroundColor: '#3B82F6',
+            paddingAll: '20px',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'box',
+                layout: 'vertical',
+                margin: 'md',
+                spacing: 'sm',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: 'メニュー',
+                        color: '#6B7280',
+                        size: 'sm',
+                        flex: 2,
+                      },
+                      {
+                        type: 'text',
+                        text: booking.menu,
+                        size: 'sm',
+                        weight: 'bold',
+                        flex: 3,
+                        wrap: true,
+                      },
+                    ],
+                  },
+                  {
+                    type: 'separator',
+                    margin: 'sm',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: '日付',
+                        color: '#6B7280',
+                        size: 'sm',
+                        flex: 2,
+                      },
+                      {
+                        type: 'text',
+                        text: booking.date,
+                        size: 'sm',
+                        weight: 'bold',
+                        flex: 3,
+                      },
+                    ],
+                  },
+                  {
+                    type: 'separator',
+                    margin: 'sm',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: '時間',
+                        color: '#6B7280',
+                        size: 'sm',
+                        flex: 2,
+                      },
+                      {
+                        type: 'text',
+                        text: booking.slot,
+                        size: 'sm',
+                        weight: 'bold',
+                        flex: 3,
+                      },
+                    ],
+                  },
+                  {
+                    type: 'separator',
+                    margin: 'sm',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: '料金',
+                        color: '#6B7280',
+                        size: 'sm',
+                        flex: 2,
+                      },
+                      {
+                        type: 'text',
+                        text: booking.price,
+                        size: 'sm',
+                        weight: 'bold',
+                        color: '#3B82F6',
+                        flex: 3,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            paddingAll: '20px',
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#3B82F6',
+                action: {
+                  type: 'uri',
+                  label: 'マイページで予約を確認',
+                  uri: 'https://miniapp.line.me/2010454791-miMuAYxd/mypage',
+                },
+              },
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'uri',
+                  label: 'キャンセルはこちら',
+                  uri: 'https://miniapp.line.me/2010454791-miMuAYxd/mypage',
+                },
+              },
+            ],
+            paddingAll: '20px',
+          },
+        },
+      };
 
       try {
         await axios.post(
           'https://api.line.me/v2/bot/message/push',
           {
             to: booking.lineUserId,
-            messages: [{ type: 'text', text: message }],
+            messages: [flexMessage],
           },
           {
             headers: {
@@ -52,7 +217,7 @@ exports.sendDailyReminders = onSchedule(
         );
         console.log(`送信完了: ${booking.lineUserId}`);
       } catch (e) {
-        console.error(`送信失敗: ${booking.lineUserId}`, e);
+        console.error(`送信失敗: ${booking.lineUserId}`, e.message);
       }
     }
 
