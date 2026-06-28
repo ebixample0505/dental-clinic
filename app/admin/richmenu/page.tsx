@@ -6,22 +6,28 @@ type MenuItem = {
   url: string;
 };
 
-const defaultMenuItems: MenuItem[] = [
-  { label: '予約する', url: 'https://miniapp.line.me/2010454791-miMuAYxd' },
-  { label: 'クーポン', url: 'https://miniapp.line.me/2010454791-miMuAYxd/coupon' },
-  { label: 'お知らせ', url: 'https://miniapp.line.me/2010454791-miMuAYxd' },
-  { label: '予約確認', url: 'https://miniapp.line.me/2010454791-miMuAYxd/mypage' },
-  { label: 'スタッフ紹介', url: 'https://miniapp.line.me/2010454791-miMuAYxd' },
-  { label: '電話する', url: 'tel:00000000000' },
-];
-
 export default function AdminRichMenuPage() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(defaultMenuItems);
+  const [tabALabel, setTabALabel] = useState('メインメニュー');
+  const [tabBLabel, setTabBLabel] = useState('お得情報');
+  const [tabAItems, setTabAItems] = useState<MenuItem[]>([
+    { label: '予約する', url: 'https://miniapp.line.me/2010454791-miMuAYxd' },
+    { label: 'クーポン', url: 'https://miniapp.line.me/2010454791-miMuAYxd/coupon' },
+    { label: '予約確認', url: 'https://miniapp.line.me/2010454791-miMuAYxd/mypage' },
+  ]);
+  const [tabBItems, setTabBItems] = useState<MenuItem[]>([
+    { label: 'キャンペーン', url: 'https://miniapp.line.me/2010454791-miMuAYxd' },
+    { label: 'SNS', url: 'https://miniapp.line.me/2010454791-miMuAYxd' },
+    { label: '電話する', url: 'tel:00000000000' },
+  ]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [richMenuId, setRichMenuId] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [uploadMessage, setUploadMessage] = useState('');
+  const [tabAId, setTabAId] = useState('');
+  const [tabBId, setTabBId] = useState('');
+  const [tabAImage, setTabAImage] = useState<File | null>(null);
+  const [tabBImage, setTabBImage] = useState<File | null>(null);
+  const [uploadMessageA, setUploadMessageA] = useState('');
+  const [uploadMessageB, setUploadMessageB] = useState('');
+  const [activePreview, setActivePreview] = useState<'A' | 'B'>('A');
 
   useEffect(() => {
     const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
@@ -33,18 +39,21 @@ export default function AdminRichMenuPage() {
   const handleCreate = async () => {
     setLoading(true);
     setMessage('');
-    setRichMenuId('');
-    setUploadMessage('');
+    setTabAId('');
+    setTabBId('');
+    setUploadMessageA('');
+    setUploadMessageB('');
     try {
       const res = await fetch('/api/richmenu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menuItems }),
+        body: JSON.stringify({ tabAItems, tabBItems, tabALabel, tabBLabel }),
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage('リッチメニューを作成しました！次に背景画像をアップロードしてください。');
-        setRichMenuId(data.richMenuId);
+        setMessage('2つのリッチメニューを作成しました！タブAの画像をアップロードしてください。');
+        setTabAId(data.tabAId);
+        setTabBId(data.tabBId);
       } else {
         setMessage(`エラー: ${data.error}`);
       }
@@ -55,17 +64,17 @@ export default function AdminRichMenuPage() {
     }
   };
 
-  const handleImageUpload = async () => {
-    if (!imageFile || !richMenuId) {
-      setUploadMessage('画像とリッチメニューIDが必要です');
-      return;
-    }
+  const handleImageUpload = async (richMenuId: string, imageFile: File, tab: 'A' | 'B') => {
+    if (!imageFile || !richMenuId) return;
     setLoading(true);
-    setUploadMessage('');
     try {
       const formData = new FormData();
       formData.append('image', imageFile);
       formData.append('richMenuId', richMenuId);
+      formData.append('isDefault', tab === 'A' ? 'true' : 'false');
+      formData.append('tabAId', tabAId);
+      formData.append('tabBId', tabBId);
+      formData.append('isLastUpload', tab === 'B' ? 'true' : 'false');
 
       const res = await fetch('/api/richmenu', {
         method: 'PUT',
@@ -73,26 +82,36 @@ export default function AdminRichMenuPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setUploadMessage('画像のアップロードが完了しました！LINEアプリを確認してください。');
+        if (tab === 'A') {
+          setUploadMessageA('タブAの画像をアップロードしました！次にタブBの画像をアップロードしてください。');
+        } else {
+          setUploadMessageB('完了！LINEアプリを再起動して確認してください。');
+        }
       } else {
-        setUploadMessage(`エラー: ${data.error}`);
+        if (tab === 'A') setUploadMessageA(`エラー: ${data.error}`);
+        else setUploadMessageB(`エラー: ${data.error}`);
       }
     } catch (e) {
-      setUploadMessage('エラーが発生しました');
+      if (tab === 'A') setUploadMessageA('エラーが発生しました');
+      else setUploadMessageB('エラーが発生しました');
     } finally {
       setLoading(false);
     }
   };
 
-  const positions = [
-    '左上', '中央上', '右上',
-    '左下', '中央下', '右下',
-  ];
+  const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500'];
 
-  const colors = [
-    'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
-    'bg-red-500', 'bg-purple-500', 'bg-pink-500',
-  ];
+  const updateItem = (tab: 'A' | 'B', index: number, field: 'label' | 'url', value: string) => {
+    if (tab === 'A') {
+      const newItems = [...tabAItems];
+      newItems[index] = { ...newItems[index], [field]: value };
+      setTabAItems(newItems);
+    } else {
+      const newItems = [...tabBItems];
+      newItems[index] = { ...newItems[index], [field]: value };
+      setTabBItems(newItems);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -104,14 +123,32 @@ export default function AdminRichMenuPage() {
           &lt;- 管理画面に戻る
         </button>
         <h1 className="text-lg font-bold">リッチメニュー管理</h1>
-        <p className="text-xs text-gray-400 mt-1">6分割レイアウト</p>
+        <p className="text-xs text-gray-400 mt-1">2タブ・3分割レイアウト</p>
       </div>
 
       {/* プレビュー */}
       <div className="m-4 bg-white rounded-xl shadow p-4">
         <h2 className="font-bold mb-3">プレビュー</h2>
+        <div className="flex gap-2 mb-3">
+          <button
+            onClick={() => setActivePreview('A')}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold ${
+              activePreview === 'A' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {tabALabel}
+          </button>
+          <button
+            onClick={() => setActivePreview('B')}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold ${
+              activePreview === 'B' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {tabBLabel}
+          </button>
+        </div>
         <div className="grid grid-cols-3 gap-1 rounded-xl overflow-hidden border">
-          {menuItems.map((item, i) => (
+          {(activePreview === 'A' ? tabAItems : tabBItems).map((item, i) => (
             <div
               key={i}
               className={`${colors[i]} text-white p-4 text-center text-sm font-bold min-h-16 flex items-center justify-center`}
@@ -122,43 +159,75 @@ export default function AdminRichMenuPage() {
         </div>
       </div>
 
-      {/* ボタン設定 */}
+      {/* タブA設定 */}
       <div className="m-4 bg-white rounded-xl shadow p-4">
-        <h2 className="font-bold mb-3">ボタン設定</h2>
-        <div className="space-y-4">
-          {menuItems.map((item, i) => (
+        <div className="flex items-center gap-2 mb-3">
+          <div className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">タブA</div>
+          <input
+            type="text"
+            value={tabALabel}
+            onChange={e => setTabALabel(e.target.value)}
+            className="flex-1 border rounded-lg p-2 text-sm font-bold"
+            placeholder="タブ名"
+          />
+        </div>
+        <div className="space-y-3">
+          {tabAItems.map((item, i) => (
             <div key={i} className="border rounded-xl p-3">
               <div className={`inline-block ${colors[i]} text-white text-xs font-bold px-2 py-1 rounded-full mb-2`}>
-                {positions[i]}
+                ボタン{i + 1}
               </div>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-sm font-bold text-gray-700">ラベル</label>
-                  <input
-                    type="text"
-                    value={item.label}
-                    onChange={e => {
-                      const newItems = [...menuItems];
-                      newItems[i] = { ...newItems[i], label: e.target.value };
-                      setMenuItems(newItems);
-                    }}
-                    className="w-full border rounded-lg p-2 mt-1 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-bold text-gray-700">リンクURL</label>
-                  <input
-                    type="text"
-                    value={item.url}
-                    onChange={e => {
-                      const newItems = [...menuItems];
-                      newItems[i] = { ...newItems[i], url: e.target.value };
-                      setMenuItems(newItems);
-                    }}
-                    className="w-full border rounded-lg p-2 mt-1 text-sm"
-                  />
-                </div>
+              <input
+                type="text"
+                value={item.label}
+                onChange={e => updateItem('A', i, 'label', e.target.value)}
+                placeholder="ラベル"
+                className="w-full border rounded-lg p-2 mb-2 text-sm"
+              />
+              <input
+                type="text"
+                value={item.url}
+                onChange={e => updateItem('A', i, 'url', e.target.value)}
+                placeholder="リンクURL"
+                className="w-full border rounded-lg p-2 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* タブB設定 */}
+      <div className="m-4 bg-white rounded-xl shadow p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">タブB</div>
+          <input
+            type="text"
+            value={tabBLabel}
+            onChange={e => setTabBLabel(e.target.value)}
+            className="flex-1 border rounded-lg p-2 text-sm font-bold"
+            placeholder="タブ名"
+          />
+        </div>
+        <div className="space-y-3">
+          {tabBItems.map((item, i) => (
+            <div key={i} className="border rounded-xl p-3">
+              <div className={`inline-block ${colors[i]} text-white text-xs font-bold px-2 py-1 rounded-full mb-2`}>
+                ボタン{i + 1}
               </div>
+              <input
+                type="text"
+                value={item.label}
+                onChange={e => updateItem('B', i, 'label', e.target.value)}
+                placeholder="ラベル"
+                className="w-full border rounded-lg p-2 mb-2 text-sm"
+              />
+              <input
+                type="text"
+                value={item.url}
+                onChange={e => updateItem('B', i, 'url', e.target.value)}
+                placeholder="リンクURL"
+                className="w-full border rounded-lg p-2 text-sm"
+              />
             </div>
           ))}
         </div>
@@ -173,7 +242,7 @@ export default function AdminRichMenuPage() {
         </div>
       )}
 
-      {/* リッチメニュー作成ボタン */}
+      {/* 作成ボタン */}
       <div className="m-4">
         <button
           onClick={handleCreate}
@@ -185,63 +254,78 @@ export default function AdminRichMenuPage() {
       </div>
 
       {/* 画像アップロード */}
-      {richMenuId && (
-        <div className="m-4 bg-white rounded-xl shadow p-4">
-          <h2 className="font-bold mb-2">背景画像をアップロード</h2>
-          <div className="bg-blue-50 rounded-lg p-3 mb-3">
-            <p className="text-xs text-blue-700 font-bold">画像の作り方</p>
-            <p className="text-xs text-blue-600 mt-1">
-              1. Canva（無料）で新規デザインを作成
-            </p>
-            <p className="text-xs text-blue-600">
-              2. カスタムサイズ：2500 × 1686px
-            </p>
-            <p className="text-xs text-blue-600">
-              3. 6分割のデザインを作成
-            </p>
-            <p className="text-xs text-blue-600">
-              4. PNG形式でダウンロード
-            </p>
+      {tabAId && tabBId && (
+        <div className="space-y-4 mx-4 mb-8">
+
+          {/* タブA画像 */}
+          <div className="bg-white rounded-xl shadow p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">タブA</div>
+              <h2 className="font-bold">背景画像をアップロード</h2>
+            </div>
+            <p className="text-xs text-gray-500 mb-1">PNG/JPEG・2500×1686px推奨</p>
+            <p className="text-xs text-gray-400 mb-3">ID: {tabAId}</p>
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={e => setTabAImage(e.target.files?.[0] || null)}
+              className="w-full border rounded-lg p-2 mb-2 text-sm"
+            />
+            {uploadMessageA && (
+              <p className={`text-sm font-bold text-center mb-2 ${
+                uploadMessageA.includes('エラー') ? 'text-red-500' : 'text-green-600'
+              }`}>
+                {uploadMessageA}
+              </p>
+            )}
+            <button
+              onClick={() => tabAImage && handleImageUpload(tabAId, tabAImage, 'A')}
+              disabled={loading || !tabAImage}
+              className="w-full bg-blue-600 text-white rounded-xl py-3 font-bold disabled:opacity-50"
+            >
+              {loading ? 'アップロード中...' : 'タブAの画像をアップロード'}
+            </button>
           </div>
-          <p className="text-xs text-gray-500 mb-3">
-            リッチメニューID: {richMenuId}
-          </p>
-          <input
-            type="file"
-            accept="image/png,image/jpeg"
-            onChange={e => setImageFile(e.target.files?.[0] || null)}
-            className="w-full border rounded-lg p-2 mb-3 text-sm"
-          />
-          {uploadMessage && (
-            <p className={`text-sm font-bold text-center mb-3 ${
-              uploadMessage.includes('エラー') ? 'text-red-500' : 'text-green-600'
-            }`}>
-              {uploadMessage}
-            </p>
-          )}
-          <button
-            onClick={handleImageUpload}
-            disabled={loading || !imageFile}
-            className="w-full bg-green-600 text-white rounded-xl py-3 font-bold disabled:opacity-50"
-          >
-            {loading ? 'アップロード中...' : '画像をアップロード'}
-          </button>
+
+          {/* タブB画像 */}
+          <div className="bg-white rounded-xl shadow p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">タブB</div>
+              <h2 className="font-bold">背景画像をアップロード</h2>
+            </div>
+            <p className="text-xs text-gray-500 mb-1">PNG/JPEG・2500×1686px推奨</p>
+            <p className="text-xs text-gray-400 mb-3">ID: {tabBId}</p>
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={e => setTabBImage(e.target.files?.[0] || null)}
+              className="w-full border rounded-lg p-2 mb-2 text-sm"
+            />
+            {uploadMessageB && (
+              <p className={`text-sm font-bold text-center mb-2 ${
+                uploadMessageB.includes('エラー') ? 'text-red-500' : 'text-green-600'
+              }`}>
+                {uploadMessageB}
+              </p>
+            )}
+            <button
+              onClick={() => tabBImage && handleImageUpload(tabBId, tabBImage, 'B')}
+              disabled={loading || !tabBImage}
+              className="w-full bg-green-600 text-white rounded-xl py-3 font-bold disabled:opacity-50"
+            >
+              {loading ? 'アップロード中...' : 'タブBの画像をアップロード'}
+            </button>
+          </div>
+
+          {/* 注意事項 */}
+          <div className="bg-yellow-50 rounded-xl p-4">
+            <h3 className="font-bold text-yellow-800 text-sm mb-2">手順</h3>
+            <p className="text-xs text-yellow-700">1. タブAの画像をアップロード</p>
+            <p className="text-xs text-yellow-700">2. タブBの画像をアップロード（この時点で反映完了）</p>
+            <p className="text-xs text-yellow-700">3. LINEアプリを再起動して確認</p>
+          </div>
         </div>
       )}
-
-      {/* 注意事項 */}
-      <div className="m-4 bg-yellow-50 rounded-xl p-4 mb-8">
-        <h3 className="font-bold text-yellow-800 text-sm mb-2">注意事項</h3>
-        <p className="text-xs text-yellow-700">
-          ・画像なしでも6分割のタップ領域は設定されます
-        </p>
-        <p className="text-xs text-yellow-700">
-          ・画像をアップロードするとより見やすくなります
-        </p>
-        <p className="text-xs text-yellow-700">
-          ・変更後はLINEアプリを再起動すると反映されます
-        </p>
-      </div>
     </div>
   );
 }
